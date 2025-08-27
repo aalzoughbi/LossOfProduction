@@ -13,46 +13,67 @@ def create_groups(sender, **kwargs):
         LossOfProduction,
     )
 
-    admin_models = [
-        Department,
-        AffectedArea,
-        Cause,
-        ReportingLimitArea,
-        LossOfProduction,
-    ]
-    editor_models_view = [
-        Department,
-        AffectedArea,
-        Cause,
-        ReportingLimitArea,
-        LossOfProduction,
-    ]
+    # Define models for different permission levels
+    all_models = [Department, AffectedArea, Cause, ReportingLimitArea, LossOfProduction]
+    lookup_models = [Department, AffectedArea, Cause, ReportingLimitArea]
 
-    # Admin group - add & view on all models
+    # Clear existing group permissions to ensure clean state
+    Group.objects.filter(name__in=['Admin', 'Editor', 'Reader']).delete()
+
+    # ADMIN GROUP - Full permissions on all models
     admin_group, _ = Group.objects.get_or_create(name="Admin")
-    for model in admin_models:
+    for model in all_models:
         ct = ContentType.objects.get_for_model(model)
-        for action in ["add", "view"]:
-            perms = Permission.objects.filter(content_type=ct, codename__startswith=f"{action}_")
-            admin_group.permissions.add(*perms)
+        # Add all permissions (add, change, delete, view)
+        for action in ["add", "change", "delete", "view"]:
+            try:
+                perm = Permission.objects.get(
+                    content_type=ct,
+                    codename=f"{action}_{model._meta.model_name}"
+                )
+                admin_group.permissions.add(perm)
+            except Permission.DoesNotExist:
+                pass
 
-    # Editor group - add loss, view all
+    # EDITOR GROUP - Full permissions on LossOfProduction, view only on others
     editor_group, _ = Group.objects.get_or_create(name="Editor")
-    ct = ContentType.objects.get_for_model(LossOfProduction)
-    editor_group.permissions.add(
-        *Permission.objects.filter(content_type=ct, codename__startswith="add_")
-    )
-    for model in editor_models_view:
-        ct = ContentType.objects.get_for_model(model)
-        perm = Permission.objects.get(content_type=ct, codename=f"view_{model._meta.model_name}")
-        editor_group.permissions.add(perm)
 
-    # Reader group - view loss only
-    reader_group, _ = Group.objects.get_or_create(name="Reader")
+    # Full permissions on LossOfProduction
     ct = ContentType.objects.get_for_model(LossOfProduction)
-    reader_group.permissions.add(
-        Permission.objects.get(content_type=ct, codename="view_lossofproduction")
-    )
+    for action in ["add", "change", "delete", "view"]:
+        try:
+            perm = Permission.objects.get(
+                content_type=ct,
+                codename=f"{action}_lossofproduction"
+            )
+            editor_group.permissions.add(perm)
+        except Permission.DoesNotExist:
+            pass
+
+    # View only permissions on lookup models
+    for model in lookup_models:
+        ct = ContentType.objects.get_for_model(model)
+        try:
+            perm = Permission.objects.get(
+                content_type=ct,
+                codename=f"view_{model._meta.model_name}"
+            )
+            editor_group.permissions.add(perm)
+        except Permission.DoesNotExist:
+            pass
+
+    # READER GROUP - View only permissions on all models
+    reader_group, _ = Group.objects.get_or_create(name="Reader")
+    for model in all_models:
+        ct = ContentType.objects.get_for_model(model)
+        try:
+            perm = Permission.objects.get(
+                content_type=ct,
+                codename=f"view_{model._meta.model_name}"
+            )
+            reader_group.permissions.add(perm)
+        except Permission.DoesNotExist:
+            pass
 
 
 class LossofproductionConfig(AppConfig):

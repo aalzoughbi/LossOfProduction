@@ -1,5 +1,5 @@
 from rest_framework import mixins, viewsets
-from rest_framework.permissions import IsAuthenticated, DjangoModelPermissions
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from .models import (
@@ -16,28 +16,42 @@ from .serializers import (
     ReportingLimitAreaSerializer,
     LossOfProductionSerializer,
 )
+from .permissions import LookupModelPermissions, LossOfProductionPermissions
 
 
 class BaseCRViewSet(mixins.CreateModelMixin, viewsets.ReadOnlyModelViewSet):
-    permission_classes = [IsAuthenticated, DjangoModelPermissions]
+    """Base viewset that allows Create and Read operations"""
+    pass
 
-class DepartmentViewSet(BaseCRViewSet):
+
+class LookupCRUDViewSet(viewsets.ModelViewSet):
+    """Full CRUD viewset for lookup models with permission control"""
+    permission_classes = [IsAuthenticated, LookupModelPermissions]
+
+
+class DepartmentViewSet(LookupCRUDViewSet):
     queryset = Department.objects.all()
     serializer_class = DepartmentSerializer
 
-class AffectedAreaViewSet(BaseCRViewSet):
+
+class AffectedAreaViewSet(LookupCRUDViewSet):
     queryset = AffectedArea.objects.all()
     serializer_class = AffectedAreaSerializer
 
-class CauseViewSet(BaseCRViewSet):
+
+class CauseViewSet(LookupCRUDViewSet):
     queryset = Cause.objects.all()
     serializer_class = CauseSerializer
 
-class ReportingLimitAreaViewSet(BaseCRViewSet):
+
+class ReportingLimitAreaViewSet(LookupCRUDViewSet):
     queryset = ReportingLimitArea.objects.select_related("department").all()
     serializer_class = ReportingLimitAreaSerializer
 
-class LossOfProductionViewSet(BaseCRViewSet):
+
+class LossOfProductionViewSet(viewsets.ModelViewSet):
+    """Full CRUD viewset for LossOfProduction with permission control"""
+    permission_classes = [IsAuthenticated, LossOfProductionPermissions]
     queryset = (
         LossOfProduction.objects
         .select_related("department", "affected_area", "cause", "reporting_limit_area__department")
